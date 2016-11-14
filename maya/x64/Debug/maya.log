@@ -1,0 +1,4 @@
+﻿  PipeNode.cpp
+c:\users\ben\documents\visual studio 2015\projects\maya\maya\pipenode.cpp(269): warning C4244: 'argument': conversion from 'const double' to 'const int', possible loss of data
+  maya.vcxproj -> C:\Users\Ben\Documents\Visual Studio 2015\Projects\maya\x64\Debug\maya.mll
+  maya.vcxproj -> C:\Users\Ben\Documents\Visual Studio 2015\Projects\maya\x64\Debug\maya.pdb (Partial PDB)
