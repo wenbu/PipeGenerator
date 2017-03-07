@@ -86,12 +86,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Program Files\Autodesk\Maya2016\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\Autodesk\Maya2017\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN64;_WINDOWS;_USRDLL;NT_PLUGIN;REQUIRE_IOSTREAM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2016\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2017\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/export:initializePlugin /export:uninitializePlugin %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -116,14 +116,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Program Files\Autodesk\Maya2016\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\Autodesk\Maya2017\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WIN64;_WINDOWS;_USRDLL;NT_PLUGIN;REQUIRE_IOSTREAM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2016\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2017\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/export:initializePlugin /export:uninitializePlugin %(AdditionalOptions)</AdditionalOptions>
     </Link>
