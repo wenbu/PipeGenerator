@@ -58,15 +58,6 @@ private:
 	MStatus makePipe();
 	MStatus makeCaps();
 	int numVertsInPipe();
-	MStatus transformPoints(int* vertexIndices, int numVertices, MTransformationMatrix transformMatrix);
-	MStatus extrudeWithTransform(int faceIndex, int* vertexIndices, int numVertices, MTransformationMatrix transformMatrix);
-	MStatus extrudeWithNewPositions(int faceIndex, int* vertexIndices, int numVertices, std::vector<MPoint> newPositions);
-	MStatus doExtrudeWithTranslate(int& firstVertexIndex, int numVertices, int faceIndex, MPoint& scalePivot, MVector translateDirection, double translateMagnitude);
-	MStatus doExtrudeWithUniformScale(int& firstVertexIndex, int numVertices, int faceIndex, MPoint scalePivot, double scaleFactor);
-
-	// probably a better way to do this than pass in bools
-	template<typename T> static MStatus registerNumericAttribute(MObject* attribute, const char* fullName, const char* shortName, MFnNumericData::Type type,
-		T defaultValue = 0, bool hasMin = false, T minValue = 0, bool hasMax = false, T maxValue = 0);
 
 	static MObject attrObjCurve;
 	static MObject attrObjRadialSubdivisions;

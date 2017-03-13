@@ -1,4 +1,7 @@
 #include "PipeNode.h"
+#include "ArrayUtil.h"
+#include "AttributeUtil.h"
+#include "MeshUtil.h"
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MItCurveCV.h>
@@ -43,31 +46,6 @@ PipeNode::PipeNode()
 
 PipeNode::~PipeNode()
 {
-}
-
-int* rotateArrayCopy(int* src, int size, int amount)
-{
-	int* dst = new int[size];
-	for (int sidx = amount, didx = 0; sidx < size; sidx++, didx++)
-	{
-		dst[didx] = src[sidx];
-	}
-	for (int sidx = 0, didx = size - amount; didx < size; sidx++, didx++)
-	{
-		dst[didx] = src[sidx];
-	}
-	return dst;
-}
-
-int* range(int rangeStart, int rangeEnd)
-{
-	int size = rangeEnd - rangeStart;
-	int* arr = new int[size];
-	for (int i = 0; i < size; i++)
-	{
-		arr[i] = rangeStart + i;
-	}
-	return arr;
 }
 
 MStatus PipeNode::compute(const MPlug& plug, MDataBlock& dataBlock)
@@ -375,7 +353,7 @@ MStatus PipeNode::makePipe()
 				{
 					vertIndices[k] = vertIndexStart + k;
 				}
-				transformPoints(vertIndices, numSides, transform);
+				MeshUtil::transformPoints(fnMesh, vertIndices, numSides, transform);
 				delete[] vertIndices;
 			}
 		}
@@ -408,28 +386,28 @@ MStatus PipeNode::makeCaps()
 		MVector spanVectorDirection = (i == 0 ? spanVectors[0] : spanVectors[spanVectors.size() - 1]).normal();
 
 		// back up existing verts a bit for edge loop
-		int* vertexIndices = range(pipeVertexOffset, pipeVertexOffset + numSides);
+		int* vertexIndices = ArrayUtil::range(pipeVertexOffset, pipeVertexOffset + numSides);
 		MTransformationMatrix transform;
 		double capThick = shouldCreateCap ? capThickness : 0;
 		MVector translateVector = spanVectorDirection * (-extrusionDir * (capThick + initialCapTightness));
 		transform.setTranslation(translateVector, MSpace::kWorld);
-		transformPoints(vertexIndices, numSides, transform);
+		MeshUtil::transformPoints(fnMesh, vertexIndices, numSides, transform);
 		delete[] vertexIndices;
 		scalePivot += translateVector;
 
 		
 		// extrude down for initial edge loop 1
-		doExtrudeWithTranslate(vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * initialCapTightness);
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * initialCapTightness);
 
 		if (!shouldCreateCap) continue;
 
 		// extrude out for initial edge loop 2
-		doExtrudeWithUniformScale(vertexOffset, numSides, face, scalePivot, (sectionRadius + initialCapTightness) / sectionRadius);
+		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, (sectionRadius + initialCapTightness) / sectionRadius);
 		
 		// make cap shape; 0 = circle so do nothing
 		if (numCapSides > 0)
 		{
-			int* vertexIndices = range(vertexOffset, vertexOffset + numSides);
+			int* vertexIndices = ArrayUtil::range(vertexOffset, vertexOffset + numSides);
 			 
 			// get around weird maya behavior
 			if (shouldFlipVert)
@@ -530,7 +508,7 @@ MStatus PipeNode::makeCaps()
 			int amountToRotate = 0;
 			for (int j = 0; j < numSides; j++)
 			{
-				int* testIndices = rotateArrayCopy(vertexIndices, numSides, j);
+				int* testIndices = ArrayUtil::rotateArrayCopy(vertexIndices, numSides, j);
 				for (int k = 0; k < numSides; k++)
 				{
 					testIndices[k] = testIndices[k] - numSides;
@@ -553,32 +531,32 @@ MStatus PipeNode::makeCaps()
 			}
 			if (amountToRotate != 0)
 			{
-				int* rotatedVertexIndices = rotateArrayCopy(vertexIndices, numSides, amountToRotate);
+				int* rotatedVertexIndices = ArrayUtil::rotateArrayCopy(vertexIndices, numSides, amountToRotate);
 				delete[] vertexIndices;
 				vertexIndices = rotatedVertexIndices;
 			}
-			extrudeWithNewPositions(face, vertexIndices, numSides, newPositions);
+			MeshUtil::extrudeWithNewPositions(fnMesh, face, vertexIndices, numSides, newPositions);
 			delete[] vertexIndices;
 			vertexOffset += numSides;
 		}
 			
 		// extrude out for second edge loop 1
-		doExtrudeWithUniformScale(vertexOffset, numSides, face, scalePivot, capRadius / (capRadius - secondCapTightness));
+		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, capRadius / (capRadius - secondCapTightness));
 
 		// extrude down for second edge loop 2
-		doExtrudeWithTranslate(vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * secondCapTightness);
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * secondCapTightness);
 		
 		// body extrusion
-		doExtrudeWithTranslate(vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * (capThickness - secondCapTightness - thirdCapTightness));
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * (capThickness - secondCapTightness - thirdCapTightness));
 		
 		// extrude down for third edge loop 1
-		doExtrudeWithTranslate(vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * thirdCapTightness);
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * thirdCapTightness);
 
 		// extrude in for third edge loop 2
-		doExtrudeWithUniformScale(vertexOffset, numSides, face, scalePivot, (capRadius - thirdCapTightness) / capRadius);
+		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, (capRadius - thirdCapTightness) / capRadius);
 		
 		// extrude in
-		doExtrudeWithUniformScale(vertexOffset, numSides, face, scalePivot, 0.5);
+		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, 0.5);
 
 		// bolts TODO
 	}
@@ -595,110 +573,9 @@ int PipeNode::numVertsInPipe()
 	return numEdgeLoops * numSides;
 }
 
-MStatus PipeNode::transformPoints(int* vertexIndices, int numVertices, MTransformationMatrix transformMatrix)
-{
-	for (int i = 0; i < numVertices; i++)
-	{
-		int vidx = vertexIndices[i];
-		MPoint pt;
-		fnMesh.getPoint(vidx, pt, MSpace::kObject);
-		fnMesh.setPoint(vidx, pt * transformMatrix.asMatrix(), MSpace::kObject);
-		// error handling?
-	}
-	return MS::kSuccess;
-}
-
-MStatus PipeNode::doExtrudeWithTranslate(int& firstVertexIndex, int numVertices, int faceIndex, MPoint& scalePivot, MVector translateDirection, double translateMagnitude)
-{
-	int* vertexIndices = range(firstVertexIndex, firstVertexIndex + numVertices);
-	MTransformationMatrix transform;
-	MVector translateVector = translateDirection * translateMagnitude;
-	transform.setTranslation(translateVector, MSpace::kWorld);
-	extrudeWithTransform(faceIndex, vertexIndices, numVertices, transform);
-	delete[] vertexIndices;
-
-	firstVertexIndex += numVertices;
-	scalePivot += translateVector;
-	return MS::kSuccess;
-}
-
-MStatus PipeNode::doExtrudeWithUniformScale(int& firstVertexIndex, int numVertices, int faceIndex, MPoint scalePivot, double scaleFactor)
-{
-	int* vertexIndices = range(firstVertexIndex, firstVertexIndex + numVertices);
-	MTransformationMatrix transform;
-	double scale[3] = { scaleFactor, scaleFactor, scaleFactor };
-	transform.setScale(scale, MSpace::kWorld);
-	transform.setScalePivot(scalePivot, MSpace::kWorld, false);
-	extrudeWithTransform(faceIndex, vertexIndices, numVertices, transform);
-	delete[] vertexIndices;
-
-	firstVertexIndex += numVertices;
-	return MS::kSuccess;
-}
-
-MStatus PipeNode::extrudeWithTransform(int faceIndex, int* vertexIndices, int numVertices, MTransformationMatrix transformMatrix)
-{
-	MIntArray faceArray(1, faceIndex);
-	fnMesh.extrudeFaces(faceArray, 1, &MFloatVector(0, 0, 0), true);
-
-	for (int i = 0; i < numVertices; i++)
-	{
-		int vidx = vertexIndices[i];
-		MPoint pt;
-		fnMesh.getPoint(vidx, pt, MSpace::kObject);
-		fnMesh.setPoint(vidx, pt * transformMatrix.asMatrix(), MSpace::kObject);
-		// error handling?
-	}
-	return MS::kSuccess;
-}
-
-MStatus PipeNode::extrudeWithNewPositions(int faceIndex, int* vertexIndices, int numVertices, std::vector<MPoint> newPositions)
-{
-	MIntArray faceArray(1, faceIndex);
-	fnMesh.extrudeFaces(faceArray, 1, &MFloatVector(0, 0, 0), true);
-	// assume numVertices == newPositions.size()
-	for (int i = 0; i < numVertices; i++)
-	{
-		int vidx = vertexIndices[i];
-		MPoint npt = newPositions[i];
-		fnMesh.setPoint(vidx, npt, MSpace::kObject);
-		// error handling?
-	}
-	return MS::kSuccess;
-}
-
 void* PipeNode::creator()
 {
 	return new PipeNode;
-}
-
-template<typename T>
-static MStatus PipeNode::registerNumericAttribute(MObject* attribute, const char* fullName,  const char* shortName, MFnNumericData::Type type,
-	T defaultValue, bool hasMin, T minValue, bool hasMax, T maxValue)
-{
-	MStatus stat;
-	MFnNumericAttribute numAttr;
-	*attribute = numAttr.create(fullName, shortName, type, defaultValue, &stat);
-	if (!stat) return stat;
-	stat = numAttr.setKeyable(true);
-	if (!stat) return stat;
-	stat = numAttr.setReadable(true);
-	if (!stat) return stat;
-	if (hasMin)
-	{
-		stat = numAttr.setMin(minValue);
-		if (!stat) return stat;
-	}
-	if (hasMax)
-	{
-		stat = numAttr.setMax(maxValue);
-		if (!stat) return stat;
-	}
-	stat = addAttribute(*attribute);
-	if (!stat) return stat;
-	stat = attributeAffects(*attribute, attrObjMesh);
-	if (!stat) return stat;
-	return MS::kSuccess;
 }
 
 MStatus PipeNode::initialize()
@@ -718,19 +595,19 @@ MStatus PipeNode::initialize()
 	addAttribute(attrObjCurve);
 	attributeAffects(attrObjCurve, attrObjMesh);
 
-	registerNumericAttribute<double>(&attrObjSectionRadius, "radius", "r", MFnNumericData::kDouble, 1.0);
-	registerNumericAttribute<int>(&attrObjRadialSubdivisions, "radialSubdivisions", "d", MFnNumericData::kInt, 8, true, 3, true, 100);
-	registerNumericAttribute<int>(&attrObjNumCapSides, "capShape", "cs", MFnNumericData::kInt, 4);
-	registerNumericAttribute<double>(&attrObjCapThickness, "capThickness", "ct", MFnNumericData::kDouble, 1.0);
-	registerNumericAttribute<bool>(&attrObjCreateBeginningCap, "createBeginningCap", "cbc", MFnNumericData::kBoolean, true);
-	registerNumericAttribute<double>(&attrObjBeginningCapRotation, "beginningCapRotation", "bcr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
-	registerNumericAttribute<bool>(&attrObjCreateEndCap, "createEndCap", "cec", MFnNumericData::kBoolean, true);
-	registerNumericAttribute<double>(&attrObjEndCapRotation, "endCapRotation", "ecr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
-	registerNumericAttribute<double>(&attrObjCapRadius, "capRadius", "cra", MFnNumericData::kDouble, 2.0, true, 0.0);
-	registerNumericAttribute<double>(&attrObjInitialCapTightness, "initialCapTightness", "ict", MFnNumericData::kDouble, 0.1, true, 0.001);
-	registerNumericAttribute<double>(&attrObjSecondCapTightness, "secondCapTightness", "sct", MFnNumericData::kDouble, 0.1, true, 0.001);
-	registerNumericAttribute<double>(&attrObjThirdCapTightness, "thirdCapTightness", "tct", MFnNumericData::kDouble, 0.1, true, 0.001);
-	registerNumericAttribute<double>(&attrObjSideCapTightness, "sideCapTightness", "sict", MFnNumericData::kDouble, 0.1, true, 0.001);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjSectionRadius, &attrObjMesh, "radius", "r", MFnNumericData::kDouble, 1.0);
+	AttributeUtil::registerNumericAttribute<int>(&attrObjRadialSubdivisions, &attrObjMesh, "radialSubdivisions", "d", MFnNumericData::kInt, 8, true, 3, true, 100);
+	AttributeUtil::registerNumericAttribute<int>(&attrObjNumCapSides, &attrObjMesh, "capShape", "cs", MFnNumericData::kInt, 4);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjCapThickness, &attrObjMesh, "capThickness", "ct", MFnNumericData::kDouble, 1.0);
+	AttributeUtil::registerNumericAttribute<bool>(&attrObjCreateBeginningCap, &attrObjMesh, "createBeginningCap", "cbc", MFnNumericData::kBoolean, true);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjBeginningCapRotation, &attrObjMesh, "beginningCapRotation", "bcr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
+	AttributeUtil::registerNumericAttribute<bool>(&attrObjCreateEndCap, &attrObjMesh, "createEndCap", "cec", MFnNumericData::kBoolean, true);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjEndCapRotation, &attrObjMesh, "endCapRotation", "ecr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjCapRadius, &attrObjMesh, "capRadius", "cra", MFnNumericData::kDouble, 2.0, true, 0.0);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjInitialCapTightness, &attrObjMesh, "initialCapTightness", "ict", MFnNumericData::kDouble, 0.1, true, 0.001);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjSecondCapTightness, &attrObjMesh, "secondCapTightness", "sct", MFnNumericData::kDouble, 0.1, true, 0.001);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjThirdCapTightness, &attrObjMesh, "thirdCapTightness", "tct", MFnNumericData::kDouble, 0.1, true, 0.001);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjSideCapTightness, &attrObjMesh, "sideCapTightness", "sict", MFnNumericData::kDouble, 0.1, true, 0.001);
 	
 	attrObjRadiusArray = numAttr.create("radiusPerCorner", "rpc", MFnNumericData::kDouble, 2.0);
 	numAttr.setArray(true);
@@ -739,8 +616,8 @@ MStatus PipeNode::initialize()
 	addAttribute(attrObjRadiusArray);
 	attributeAffects(attrObjRadiusArray, attrObjMesh);
 
-	registerNumericAttribute<double>(&attrObjPipeRotation, "pipeRotation", "pr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
-	registerNumericAttribute<double>(&attrObjCornerAnglePerDivision, "cornerAnglePerDivision", "cad", MFnNumericData::kDouble, 30.0, true, 0.1, true, 90.0);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjPipeRotation, &attrObjMesh, "pipeRotation", "pr", MFnNumericData::kDouble, 0.0, true, 0.0, true, 360.0);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjCornerAnglePerDivision, &attrObjMesh, "cornerAnglePerDivision", "cad", MFnNumericData::kDouble, 30.0, true, 0.1, true, 90.0);
 	
 	attrObjBoltPath = typedAttr.create("boltPath", "bp", MFnData::kString, MFnStringData().create());
 	typedAttr.setKeyable(true);
@@ -748,7 +625,7 @@ MStatus PipeNode::initialize()
 	addAttribute(attrObjBoltPath);
 	attributeAffects(attrObjBoltPath, attrObjMesh);
 
-	registerNumericAttribute<double>(&attrObjBoltScale, "boltScale", "bs", MFnNumericData::kDouble, 1.0);
-	registerNumericAttribute<int>(&attrObjSeed, "seed", "s", MFnNumericData::kInt, 2938);
+	AttributeUtil::registerNumericAttribute<double>(&attrObjBoltScale, &attrObjMesh, "boltScale", "bs", MFnNumericData::kDouble, 1.0);
+	AttributeUtil::registerNumericAttribute<int>(&attrObjSeed, &attrObjMesh, "seed", "s", MFnNumericData::kInt, 2938);
 	return MStatus::kSuccess;
 }
