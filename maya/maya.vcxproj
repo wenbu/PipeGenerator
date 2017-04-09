@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ArrayUtil.cpp" />
+    <ClCompile Include="CapNode.cpp" />
     <ClCompile Include="MeshUtil.cpp" />
     <ClCompile Include="PipeGeneratorCommand.cpp" />
     <ClCompile Include="PipeGeneratorPlugin.cpp" />
@@ -138,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="ArrayUtil.h" />
     <ClInclude Include="AttributeUtil.h" />
+    <ClInclude Include="CapNode.h" />
     <ClInclude Include="MeshUtil.h" />
     <ClInclude Include="PipeGeneratorCommand.h" />
     <ClInclude Include="PipeNode.h" />

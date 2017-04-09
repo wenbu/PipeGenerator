@@ -18,30 +18,18 @@ public:
 	static void* creator();
 	static MStatus initialize();
 private:
-	int numSides;
-	double sectionRadius;
-	double cornerAnglePerDivision;
-	double pipeRotation;
-	MString boltPath;
-	double boltScale;
-	int seed;
-	bool createBeginningCap;
-	bool createEndCap;
-	MObject* boltShapeObjPtr;
-	int numCapSides;
-	double capThickness;
-	double startCapTwist;
-	double endCapTwist;
-	double capRadius;
-	double initialCapTightness;
-	double secondCapTightness;
-	double thirdCapTightness;
-	double sideCapTightness;
 	MFnMesh fnMesh;
 	MFnMeshData dataCreator;
 	MObject outputData;
 	MObject objMesh;
 
+	// ---------- populated directly from attributes ----------
+	int numSides;                  // number of sides of polygonal cross-section
+	double sectionRadius;          // radius of cross-section
+	double cornerAnglePerDivision; // angle subtended by each corner segment
+	double pipeRotation;           // twist
+
+	// ---------- derived from attributes ----------
 	std::vector<MPoint> cvPoints;
 	std::vector<MVector> spanVectors;
 	std::vector<double> angles;
@@ -53,32 +41,19 @@ private:
 	std::vector<double> spanLengthBetweenCorners;
 	std::vector<double> spanLengthFromLastCorner;
 
+	// ---------- functions ----------
 	MStatus getPipeData();
 	MStatus makeBaseMesh();
 	MStatus makePipe();
-	MStatus makeCaps();
 	int numVertsInPipe();
 
+	// ---------- attributes ----------
 	static MObject attrObjCurve;
 	static MObject attrObjRadialSubdivisions;
 	static MObject attrObjSectionRadius;
 	static MObject attrObjRadiusArray;
 	static MObject attrObjCornerAnglePerDivision;
-	static MObject attrObjNumCapSides;
-	static MObject attrObjCapThickness;
-	static MObject attrObjBeginningCapRotation;
-	static MObject attrObjEndCapRotation;
-	static MObject attrObjCreateBeginningCap;
-	static MObject attrObjCreateEndCap;
-	static MObject attrObjCapRadius;
-	static MObject attrObjInitialCapTightness;
-	static MObject attrObjSecondCapTightness;
-	static MObject attrObjThirdCapTightness;
-	static MObject attrObjSideCapTightness;
 	static MObject attrObjPipeRotation;
-	static MObject attrObjBoltPath;
-	static MObject attrObjBoltScale;
-	static MObject attrObjSeed;
 	static MObject attrObjMesh;
 };
 
