@@ -1,13 +1,17 @@
 #include "CapNode.h"
+
 #include "ArrayUtil.h"
 #include "AttributeUtil.h"
 #include "MeshUtil.h"
+#include "TransformUtil.h"
+
 #include <maya/MDagPath.h>
 #include <maya/MFnStringData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MMatrix.h>
 #include <maya/MQuaternion.h>
 #include <maya/MSelectionList.h>
+
 #include <algorithm>
 
 const MTypeId CapNode::nodeID(0xBEF0);
@@ -125,34 +129,50 @@ MStatus CapNode::compute(const MPlug& plug, MDataBlock& dataBlock)
 	return MStatus::kSuccess;
 }
 
+// Input is a mesh and two face indices. Create caps on these faces.
 MStatus CapNode::makeCaps()
 {
-	// this is pretty gross
-	int capIndices[2] = { beginningCapIndex, endCapIndex };
-	int faces[2] = { 1, 0 };
-	int dataIndices[2] = { 0, -1 };
-	int extrusionDirs[2] = { -1, 1 };
-	bool shouldFlipVerts[2] = { true, false };
-	int pipeVertexOffsets[2] = { 0, numVertsInPipe() - numSides };
-	double twists[2] = { startCapTwist, endCapTwist };
+	int faceIndices[2] = { beginningCapIndex, endCapIndex }; // initial indices of target faces
+	//int faces[2] = { 1, 0 };                                 // ??? what the fuck is this?
+	//int dataIndices[2] = { 0, -1 };                          // ??? what the fuck is this?
+	//int extrusionDirs[2] = { -1, 1 };                        // seems hacky; consider refactor
+	bool shouldFlipVerts[2] = { true, false };               // hack to get around weird maya behavior; should see if still needed
+	//int pipeVertexOffsets[2] = { 0, numVertsInPipe() - numSides }; // vertex index offsets for target faces; should consider refactor
+	double twists[2] = { startCapTwist, endCapTwist };       // twist value, in degrees
 
-	int vertexOffset = numVertsInPipe();
+	//int vertexOffset = numVertsInPipe();
+
+	// overall flow:
+	// (note: 'down' means 'in direction of face normal'; 'up' is antiparallel to this
+	//
+	// for each target face:
+	// 1) extrude
+	// 2) if numCapSides == 0
+	//      scale outwards; would like to do something with polygon skeleton but for now uniform scale suffices
+	//    else
+	//      move verts appropriately & scale outwards according to cap size
+	// 3) extrude & move down according to cap thickness
+	// 4) cap off
+	//
+	// edge loops as needed (i.e. before each step)
+
+	// currently hardcoded to two faces; can probably generalize to n faces later
 	for (int i = 0; i < 2; i++)
 	{
-		int capIndex = capIndices[i];
+		int capIndex = faceIndices[i];
 		if (capIndex == -1) continue;
 
 		MFnMesh fnMesh(inputMesh);
 		MPoint scalePivot;
 		fnMesh.getPoint(capIndex, scalePivot);
 		bool shouldFlipVert = shouldFlipVerts[i];
-		int pipeVertexOffset = pipeVertexOffsets[i];
-		int dataIndex = dataIndices[i];
-		int extrusionDir = extrusionDirs[i];
-		int face = faces[i];
+		//int pipeVertexOffset = pipeVertexOffsets[i];
+		//int dataIndex = dataIndices[i];
+		//int extrusionDir = extrusionDirs[i];
+		//int face = faces[i];
 		double twist = twists[i];
-		MVector spanVectorDirection;
-		fnMesh.getPolygonNormal(capIndex, spanVectorDirection); // needs normalization?
+		MVector normal;
+		fnMesh.getPolygonNormal(capIndex, normal); // needs normalization?
 
 		/*
 		 * need to move polygon back (i.e. opposite direction of normal) by a distance = cap thickness
@@ -161,28 +181,43 @@ MStatus CapNode::makeCaps()
 		 * are not parallel to polygon normal)
 		 */
 
+		// BACK UP FOR EDGE LOOP ONE HERE
+		MeshUtil::slideFace(objMesh, fnMesh, capIndex, -initialCapTightness);
+		/*
 		// back up existing verts a bit for edge loop
 		int* vertexIndices = ArrayUtil::range(pipeVertexOffset, pipeVertexOffset + numSides);
 		MTransformationMatrix transform;
 		double capThick = shouldCreateCap ? capThickness : 0;
-		MVector translateVector = spanVectorDirection * (-extrusionDir * (capThick + initialCapTightness));
+		MVector translateVector = normal * (-extrusionDir * (capThick + initialCapTightness));
 		transform.setTranslation(translateVector, MSpace::kWorld);
 		MeshUtil::transformPoints(fnMesh, vertexIndices, numSides, transform);
 		delete[] vertexIndices;
 		scalePivot += translateVector;
-
+		*/
 
 		// extrude down for initial edge loop 1
-		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * initialCapTightness);
+		//MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, normal, extrusionDir * initialCapTightness);
+		MeshUtil::extrude(fnMesh, capIndex);
+		MeshUtil::slideFace(fnMesh, capIndex, initialCapTightness);
 
-		if (!shouldCreateCap) continue;
+		//if (!shouldCreateCap) continue;
+
+		MPoint centroid;
+		MeshUtil::getCentroid(fnMesh, capIndex, &centroid);
+
+		double pseudoRadius;
+		getPseudoRadius(fnMesh, centroid, capIndex, &pseudoRadius);
+		double extrudeAmount = (pseudoRadius + initialCapTightness) / pseudoRadius;
 
 		// extrude out for initial edge loop 2
-		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, (sectionRadius + initialCapTightness) / sectionRadius);
+		//MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, (sectionRadius + initialCapTightness) / sectionRadius);
+		MeshUtil::extrudeWithTransform(fnMesh, capIndex, TransformUtil::getUniformScale(pseudoRadius, centroid));
 
 		// make cap shape; 0 = circle so do nothing
 		if (numCapSides > 0)
 		{
+			// consider pulling this logic into a separate method
+
 			int* vertexIndices = ArrayUtil::range(vertexOffset, vertexOffset + numSides);
 
 			// get around weird maya behavior
@@ -193,7 +228,7 @@ MStatus CapNode::makeCaps()
 
 			MTransformationMatrix capTransform;
 			MVector vRotSrc(0, 0, 1);
-			MVector vRotDst = spanVectorDirection * extrusionDir;
+			MVector vRotDst = normal * extrusionDir;
 			MQuaternion quat(vRotSrc, vRotDst);
 			capTransform.rotateTo(quat);
 			MPoint vTrnSrc(0, 0, 0);
@@ -252,6 +287,7 @@ MStatus CapNode::makeCaps()
 					int nidx = 0;
 					if (pidx == 0)
 					{
+						// do nothing
 					}
 					else if (pidx == 1)
 					{
@@ -320,13 +356,13 @@ MStatus CapNode::makeCaps()
 		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, capRadius / (capRadius - secondCapTightness));
 
 		// extrude down for second edge loop 2
-		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * secondCapTightness);
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, normal, extrusionDir * secondCapTightness);
 
 		// body extrusion
-		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * (capThickness - secondCapTightness - thirdCapTightness));
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, normal, extrusionDir * (capThickness - secondCapTightness - thirdCapTightness));
 
 		// extrude down for third edge loop 1
-		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, spanVectorDirection, extrusionDir * thirdCapTightness);
+		MeshUtil::doExtrudeWithTranslate(fnMesh, vertexOffset, numSides, face, scalePivot, normal, extrusionDir * thirdCapTightness);
 
 		// extrude in for third edge loop 2
 		MeshUtil::doExtrudeWithUniformScale(fnMesh, vertexOffset, numSides, face, scalePivot, (capRadius - thirdCapTightness) / capRadius);
@@ -336,6 +372,25 @@ MStatus CapNode::makeCaps()
 
 		// bolts TODO
 	}
+	return MS::kSuccess;
+}
+
+MStatus CapNode::getPseudoRadius(const MFnMesh& fnMesh, const MPoint& centroid, int faceIndex, double* o_pseudoRadius)
+{
+	MIntArray vertexIndices;
+	fnMesh.getPolygonVertices(faceIndex, vertexIndices);
+
+	double meanDistance = 0;
+	for (int i = 0; i < vertexIndices.length(); i++)
+	{
+		MPoint pt;
+		fnMesh.getPoint(vertexIndices[i], pt, MSpace::kObject);
+
+		meanDistance += pt.distanceTo(centroid);
+	}
+
+	meanDistance /= vertexIndices.length();
+	*o_pseudoRadius = meanDistance;
 	return MS::kSuccess;
 }
 

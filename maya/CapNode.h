@@ -19,6 +19,10 @@ public:
 private:
 	MStatus makeCaps();
 
+	// Return mean of distances from centroid to each vertex of specified face.
+	// Placeholder until we do proper polygon skeleton stuff.
+	MStatus getPseudoRadius(const MFnMesh& fnMesh, const MPoint& centroid, int faceIndex, double* o_pseudoRadius);
+
 	MObject* boltShapeObjPtr;      // pointer to bolt object, once path is resolved
 	MFnMeshData dataCreator;
 	MObject outputData;
